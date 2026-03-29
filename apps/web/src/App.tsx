@@ -14,6 +14,12 @@ import {
   Title2,
 } from "@fluentui/react-components";
 import { useEffect, useState } from "react";
+import type {
+  ApiErrorResponse,
+  GenerateYamlRequest,
+  GenerateYamlResponse,
+  ValidationWarning,
+} from "@powerapp-yaml-studio/shared";
 
 const versionOptions = [
   { value: "latest", label: "Latest" },
@@ -30,151 +36,23 @@ const cornerOptions = [
 const defaultScreenGoal =
   "Create a simple home screen with a welcome message and one action button.";
 
-type YamlScalar = string | number | boolean | null;
-type YamlValue = YamlScalar | YamlObject | YamlValue[];
+const emptyWarnings: ValidationWarning[] = [];
 
-type YamlObject = {
-  [key: string]: YamlValue;
-};
-
-function toPascalCase(value: string) {
-  const words = value
-    .replace(/[^a-zA-Z0-9\s]/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (words.length === 0) {
-    return "GeneratedScreen";
-  }
-
-  return words.map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase()).join("");
-}
-
-function getScreenName(screenGoal: string) {
-  const normalizedGoal = screenGoal.trim().toLowerCase();
-
-  if (normalizedGoal.includes("home screen")) {
-    return "HomeScreen";
-  }
-
-  return `${toPascalCase(screenGoal)}Screen`;
-}
-
-function formatYamlScalar(value: YamlScalar) {
-  if (typeof value === "string") {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
-
-  if (value === null) {
-    return "null";
-  }
-
-  return String(value);
-}
-
-function isYamlObject(value: YamlValue): value is YamlObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function renderYaml(value: YamlValue, indent = 0): string {
-  const padding = " ".repeat(indent);
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (Array.isArray(item)) {
-          return `${padding}-\n${renderYaml(item, indent + 2)}`;
-        }
-
-        if (isYamlObject(item)) {
-          const renderedObject = renderYaml(item, indent + 2).split("\n");
-          const [firstLine = "", ...restLines] = renderedObject;
-
-          return [`${padding}- ${firstLine.trimStart()}`, ...restLines].join("\n");
-        }
-
-        return `${padding}- ${formatYamlScalar(item)}`;
-      })
-      .join("\n");
-  }
-
-  if (isYamlObject(value)) {
-    return Object.entries(value)
-      .map(([key, nestedValue]) => {
-        if (Array.isArray(nestedValue) || isYamlObject(nestedValue)) {
-          return `${padding}${key}:\n${renderYaml(nestedValue, indent + 2)}`;
-        }
-
-        return `${padding}${key}: ${formatYamlScalar(nestedValue)}`;
-      })
-      .join("\n");
-  }
-
-  return `${padding}${formatYamlScalar(value)}`;
-}
-
-function generateYaml({
-  screenGoal,
-  version,
-  themeName,
-  primaryColor,
-  fontFamily,
-  cornerStyle,
-}: {
-  screenGoal: string;
-  version: string;
-  themeName: string;
-  primaryColor: string;
-  fontFamily: string;
-  cornerStyle: string;
-}) {
-  const screenName = getScreenName(screenGoal);
-  const goalText = screenGoal.trim() || "Describe the screen goal here.";
-
-  return renderYaml({
-    Screen: {
-      Name: screenName,
-      Theme: themeName,
-      Version: version,
-      Goal: goalText,
-      Style: {
-        PrimaryColor: primaryColor,
-        FontFamily: fontFamily,
-        CornerStyle: cornerStyle,
-      },
-      Controls: [
-        {
-          Type: "Label",
-          Name: "lblTitle",
-          Text: screenName,
-          X: 24,
-          Y: 24,
-        },
-        {
-          Type: "Label",
-          Name: "lblGoal",
-          Text: goalText,
-          X: 24,
-          Y: 64,
-        },
-      ],
+async function requestGeneratedYaml(payload: GenerateYamlRequest) {
+  const response = await fetch("/api/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify(payload),
   });
-}
 
-function getCompatibilityNotes(version: string) {
-  if (version === "latest") {
-    return [
-      "Using latest version",
-      "Newest screen and style properties are assumed to be available",
-    ];
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+    throw new Error(errorPayload?.error.message ?? "Unable to generate YAML right now.");
   }
 
-  return [
-    `Targeting Power Apps version ${version}`,
-    "Some properties may differ in older versions",
-  ];
+  return (await response.json()) as GenerateYamlResponse;
 }
 
 function App() {
@@ -184,19 +62,13 @@ function App() {
   const [primaryColor, setPrimaryColor] = useState("#115EA3");
   const [fontFamily, setFontFamily] = useState("Segoe UI");
   const [cornerStyle, setCornerStyle] = useState("rounded");
-  const [yamlOutput, setYamlOutput] = useState(
-    generateYaml({
-      screenGoal: defaultScreenGoal,
-      version: "latest",
-      themeName: "ContosoBlue",
-      primaryColor: "#115EA3",
-      fontFamily: "Segoe UI",
-      cornerStyle: "rounded",
-    }),
-  );
+  const [yamlOutput, setYamlOutput] = useState("");
+  const [compatibilityNotes, setCompatibilityNotes] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>(emptyWarnings);
+  const [generationError, setGenerationError] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
-  const compatibilityNotes = getCompatibilityNotes(version);
   const selectedVersionLabel =
     versionOptions.find((option) => option.value === version)?.label ?? "Latest";
   const selectedCornerLabel =
@@ -219,21 +91,43 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [copyStatus]);
 
-  function handleGenerateClick() {
+  useEffect(() => {
+    void handleGenerateClick();
+  }, []);
+
+  async function handleGenerateClick() {
     if (isGenerateDisabled) {
       return;
     }
 
-    setYamlOutput(
-      generateYaml({
+    setIsGenerating(true);
+    setGenerationError("");
+
+    try {
+      const response = await requestGeneratedYaml({
         screenGoal,
         version,
-        themeName,
-        primaryColor,
-        fontFamily,
-        cornerStyle,
-      }),
-    );
+        theme: {
+          themeName,
+          primaryColor,
+          fontFamily,
+          cornerStyle,
+        },
+      });
+
+      setYamlOutput(response.yaml);
+      setCompatibilityNotes(response.compatibilityNotes);
+      setValidationWarnings(response.validationWarnings);
+    } catch (error) {
+      setYamlOutput("");
+      setCompatibilityNotes([]);
+      setValidationWarnings(emptyWarnings);
+      setGenerationError(
+        error instanceof Error ? error.message : "Unable to generate YAML right now.",
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   async function handleCopyYaml() {
@@ -252,8 +146,12 @@ function App() {
           <Text className="product-eyebrow">PowerApp tooling</Text>
           <Title2 as="h1">PowerApp YAML Studio</Title2>
         </div>
-        <Button appearance="primary" onClick={handleGenerateClick} disabled={isGenerateDisabled}>
-          Generate YAML
+        <Button
+          appearance="primary"
+          onClick={() => void handleGenerateClick()}
+          disabled={isGenerateDisabled || isGenerating}
+        >
+          {isGenerating ? "Generating..." : "Generate YAML"}
         </Button>
       </header>
 
@@ -347,9 +245,30 @@ function App() {
                   <Text className="copy-feedback error">Copy failed</Text>
                 ) : null}
               </div>
+
+              {generationError ? (
+                <div className="message-panel error-panel" role="alert">
+                  <Body1Strong>Generation error</Body1Strong>
+                  <Body1>{generationError}</Body1>
+                </div>
+              ) : null}
+
               <Field label="YAML output">
                 <Textarea readOnly resize="vertical" value={yamlOutput} rows={12} />
               </Field>
+
+              {validationWarnings.length > 0 ? (
+                <div className="message-panel warning-panel" role="status">
+                  <Body1Strong>Validation warnings</Body1Strong>
+                  <ul className="notes-list">
+                    {validationWarnings.map((warning) => (
+                      <li key={warning.code}>
+                        <Body1>{warning.message}</Body1>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           </Card>
 
