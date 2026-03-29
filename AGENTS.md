@@ -23,6 +23,9 @@ PowerApp YAML Studio helps users generate Power Apps YAML they can copy and past
 - Apply the theme profile consistently.
 - Prefer simple, readable structures over complex ones.
 - If compatibility is uncertain, include a warning.
+- Return YAML as the primary output with no surrounding explanation when generating final results.
+- Ensure indentation and formatting are preserved for direct copy and paste.
+- If additional notes are needed, place them after the YAML in a clearly separated section.
 
 ## Backend expectations
 - Microsoft Learn MCP is used for documentation grounding.
