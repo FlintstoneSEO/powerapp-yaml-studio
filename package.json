@@ -1,0 +1,9 @@
+{
+  "name": "powerapp-yaml-studio",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "dev": "corepack pnpm --parallel --filter @powerapp-yaml-studio/api --filter @powerapp-yaml-studio/web dev"
+  }
+}
