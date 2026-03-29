@@ -14,6 +14,12 @@ import {
   Title2,
 } from "@fluentui/react-components";
 import { useEffect, useState } from "react";
+import type {
+  ApiErrorResponse,
+  GenerateYamlRequest,
+  GenerateYamlResponse,
+  ValidationWarning,
+} from "@powerapp-yaml-studio/shared";
 import {
   generateYaml,
   type GenerateYamlResponse,
@@ -35,6 +41,24 @@ const cornerOptions = [
 const defaultScreenGoal =
   "Create a simple home screen with a welcome message and one action button.";
 
+const emptyWarnings: ValidationWarning[] = [];
+
+async function requestGeneratedYaml(payload: GenerateYamlRequest) {
+  const response = await fetch("/api/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+    throw new Error(errorPayload?.error.message ?? "Unable to generate YAML right now.");
+  }
+
+  return (await response.json()) as GenerateYamlResponse;
+}
 const defaultTheme: ThemeProfile = {
   themeName: "ContosoBlue",
   primaryColor: "#115EA3",
@@ -51,6 +75,15 @@ const initialGeneration = generateYaml({
 function App() {
   const [screenGoal, setScreenGoal] = useState(defaultScreenGoal);
   const [version, setVersion] = useState("latest");
+  const [themeName, setThemeName] = useState("ContosoBlue");
+  const [primaryColor, setPrimaryColor] = useState("#115EA3");
+  const [fontFamily, setFontFamily] = useState("Segoe UI");
+  const [cornerStyle, setCornerStyle] = useState("rounded");
+  const [yamlOutput, setYamlOutput] = useState("");
+  const [compatibilityNotes, setCompatibilityNotes] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>(emptyWarnings);
+  const [generationError, setGenerationError] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [themeName, setThemeName] = useState(defaultTheme.themeName);
   const [primaryColor, setPrimaryColor] = useState(defaultTheme.primaryColor);
   const [fontFamily, setFontFamily] = useState(defaultTheme.fontFamily);
@@ -83,11 +116,42 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [copyStatus]);
 
+  useEffect(() => {
+    void handleGenerateClick();
+  }, []);
+
   async function handleGenerateClick() {
     if (isGenerateDisabled) {
       return;
     }
 
+    setIsGenerating(true);
+    setGenerationError("");
+
+    try {
+      const response = await requestGeneratedYaml({
+        screenGoal,
+        version,
+        theme: {
+          themeName,
+          primaryColor,
+          fontFamily,
+          cornerStyle,
+        },
+      });
+
+      setYamlOutput(response.yaml);
+      setCompatibilityNotes(response.compatibilityNotes);
+      setValidationWarnings(response.validationWarnings);
+    } catch (error) {
+      setYamlOutput("");
+      setCompatibilityNotes([]);
+      setValidationWarnings(emptyWarnings);
+      setGenerationError(
+        error instanceof Error ? error.message : "Unable to generate YAML right now.",
+      );
+    } finally {
+      setIsGenerating(false);
     setIsLoading(true);
     setErrorMessage("");
 
@@ -141,6 +205,10 @@ function App() {
         </div>
         <Button
           appearance="primary"
+          onClick={() => void handleGenerateClick()}
+          disabled={isGenerateDisabled || isGenerating}
+        >
+          {isGenerating ? "Generating..." : "Generate YAML"}
           onClick={handleGenerateClick}
           disabled={isGenerateDisabled || isLoading}
         >
@@ -238,9 +306,30 @@ function App() {
                   <Text className="copy-feedback error">Copy failed</Text>
                 ) : null}
               </div>
+
+              {generationError ? (
+                <div className="message-panel error-panel" role="alert">
+                  <Body1Strong>Generation error</Body1Strong>
+                  <Body1>{generationError}</Body1>
+                </div>
+              ) : null}
+
               <Field label="YAML output">
                 <Textarea readOnly resize="vertical" value={yamlOutput} rows={12} />
               </Field>
+
+              {validationWarnings.length > 0 ? (
+                <div className="message-panel warning-panel" role="status">
+                  <Body1Strong>Validation warnings</Body1Strong>
+                  <ul className="notes-list">
+                    {validationWarnings.map((warning) => (
+                      <li key={warning.code}>
+                        <Body1>{warning.message}</Body1>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {errorMessage ? <Body1 role="alert">{errorMessage}</Body1> : null}
             </div>
           </Card>

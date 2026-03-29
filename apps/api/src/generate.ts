@@ -1,40 +1,9 @@
-export type AppHealthResponse = {
-  status: "ok";
-};
-
-export type ThemeProfile = {
-  themeName: string;
-  primaryColor: string;
-  fontFamily: string;
-  cornerStyle: string;
-};
-
-export type GenerateYamlRequest = {
-  screenGoal: string;
-  version: string;
-  theme: ThemeProfile;
-};
-
-export type ValidationWarning = {
-  code: string;
-  message: string;
-};
-
-export type GenerateYamlResponse = {
-  yaml: string;
-  compatibilityNotes: string[];
-  validationWarnings: ValidationWarning[];
-};
-
-export type ApiErrorResponse = {
-  error: {
-    message: string;
-  };
-};
-export type GenerateYamlResponse = {
-  yaml: string;
-  compatibilityNotes: string[];
-};
+import type {
+  GenerateYamlRequest,
+  GenerateYamlResponse,
+  ThemeProfile,
+  ValidationWarning,
+} from "@powerapp-yaml-studio/shared";
 
 type YamlScalar = string | number | boolean | null;
 type YamlValue = YamlScalar | YamlObject | YamlValue[];
@@ -120,7 +89,7 @@ function renderYaml(value: YamlValue, indent = 0): string {
   return `${padding}${formatYamlScalar(value)}`;
 }
 
-export function getCompatibilityNotes(version: string) {
+function getCompatibilityNotes(version: string) {
   if (version === "latest") {
     return [
       "Using latest version",
@@ -134,44 +103,84 @@ export function getCompatibilityNotes(version: string) {
   ];
 }
 
-export function generateYaml({
-  screenGoal,
-  version,
-  theme,
-}: GenerateYamlRequest): GenerateYamlResponse {
-  const screenName = getScreenName(screenGoal);
+function buildMockYaml(screenGoal: string, version: string, theme: ThemeProfile): YamlObject {
   const goalText = screenGoal.trim() || "Describe the screen goal here.";
 
   return {
-    yaml: renderYaml({
-      Screen: {
-        Name: screenName,
-        Theme: theme.themeName,
-        Version: version,
-        Goal: goalText,
-        Style: {
-          PrimaryColor: theme.primaryColor,
-          FontFamily: theme.fontFamily,
-          CornerStyle: theme.cornerStyle,
-        },
-        Controls: [
-          {
-            Type: "Label",
-            Name: "lblTitle",
-            Text: screenName,
-            X: 24,
-            Y: 24,
-          },
-          {
-            Type: "Label",
-            Name: "lblGoal",
-            Text: goalText,
-            X: 24,
-            Y: 64,
-          },
-        ],
+    Screen: {
+      Name: getScreenName(screenGoal),
+      Theme: theme.themeName.trim(),
+      Version: version,
+      Goal: goalText,
+      Style: {
+        PrimaryColor: theme.primaryColor.trim(),
+        FontFamily: theme.fontFamily.trim(),
+        CornerStyle: theme.cornerStyle.trim(),
       },
-    }),
-    compatibilityNotes: getCompatibilityNotes(version),
+      Controls: [
+        {
+          Type: "Label",
+          Name: "lblTitle",
+          Text: "Welcome",
+          X: 24,
+          Y: 24,
+        },
+        {
+          Type: "Label",
+          Name: "lblGoal",
+          Text: goalText,
+          X: 24,
+          Y: 64,
+        },
+      ],
+    },
+  };
+}
+
+function validateGeneratedYaml(yaml: string, generatedObject: YamlObject, _theme: ThemeProfile) {
+  const warnings: ValidationWarning[] = [];
+  const screen = isYamlObject(generatedObject.Screen) ? generatedObject.Screen : undefined;
+
+  if (!yaml.trim()) {
+    warnings.push({
+      code: "empty_yaml",
+      message: "Generated YAML is empty.",
+    });
+  }
+
+  if (!screen || !/^Screen:\s*$/m.test(yaml)) {
+    warnings.push({
+      code: "missing_screen",
+      message: "Generated YAML should include a top-level Screen section.",
+    });
+  }
+
+  const screenName = typeof screen?.Name === "string" ? screen.Name.trim() : "";
+  if (!screenName) {
+    warnings.push({
+      code: "missing_name",
+      message: "Generated YAML should include a Screen Name value.",
+    });
+  }
+
+  const themeName = typeof screen?.Theme === "string" ? screen.Theme.trim() : "";
+  if (!themeName) {
+    warnings.push({
+      code: "missing_theme",
+      message: "Generated YAML should include a Theme value when a theme profile is provided.",
+    });
+  }
+
+  return warnings;
+}
+
+export function generateYamlResponse(request: GenerateYamlRequest): GenerateYamlResponse {
+  const generatedObject = buildMockYaml(request.screenGoal, request.version, request.theme);
+  const yaml = `${renderYaml(generatedObject).trim()}\n`;
+
+  return {
+    yaml,
+    compatibilityNotes: getCompatibilityNotes(request.version),
+    validationWarnings: validateGeneratedYaml(yaml, generatedObject, request.theme),
   };
 }

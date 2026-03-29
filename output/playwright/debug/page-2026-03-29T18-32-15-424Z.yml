@@ -1,0 +1,59 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - text: PowerApp tooling
+      - heading "PowerApp YAML Studio" [level=1] [ref=e7]
+    - button "Generate YAML" [ref=e77] [cursor=pointer]
+  - main [ref=e9]:
+    - region "Prompt builder and theme profile" [ref=e10]:
+      - group [ref=e11]:
+        - generic [ref=e12]:
+          - heading "Prompt Builder" [level=2] [ref=e14]
+          - generic [ref=e16]: Describe the app screen you want to generate.
+        - generic [ref=e17]:
+          - generic [ref=e18]:
+            - generic [ref=e19]: Screen goal
+            - textbox "Screen goal" [ref=e21]: Create a simple home screen with a welcome message and one action button.
+          - generic [ref=e22]:
+            - generic [ref=e23]: Power Apps version
+            - combobox "Power Apps version" [ref=e25] [cursor=pointer]:
+              - text: Latest
+              - img [ref=e27]
+      - group [ref=e29]:
+        - generic [ref=e30]:
+          - heading "Theme Profile" [level=2] [ref=e32]
+          - generic [ref=e34]: Set visual defaults applied to generated YAML.
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - generic [ref=e37]: Theme name
+            - textbox "Theme name" [ref=e39]: ContosoBlue
+          - generic [ref=e40]:
+            - generic [ref=e41]: Primary color
+            - textbox "Primary color" [ref=e43]: "#115EA3"
+          - generic [ref=e44]:
+            - generic [ref=e45]: Font family
+            - textbox "Font family" [ref=e47]: Segoe UI
+          - generic [ref=e48]:
+            - generic [ref=e49]: Corner style
+            - combobox "Corner style" [ref=e51] [cursor=pointer]:
+              - text: Rounded
+              - img [ref=e53]
+    - region "Generated YAML and compatibility notes" [ref=e55]:
+      - group [ref=e56]:
+        - generic [ref=e57]:
+          - heading "Generated YAML" [level=2] [ref=e59]
+          - generic [ref=e61]: Ready to copy into Power Apps Studio.
+        - generic [ref=e62]:
+          - button "Copy YAML" [ref=e64]
+          - generic [ref=e65]:
+            - generic [ref=e66]: YAML output
+            - textbox "YAML output" [ref=e68]: "Screen: Name: \"HomeScreen\" Theme: \"ContosoBlue\" Version: \"latest\" Goal: \"Create a simple home screen with a welcome message and one action button.\" Style: PrimaryColor: \"#115EA3\" FontFamily: \"Segoe UI\" CornerStyle: \"rounded\" Controls: - Type: \"Label\" Name: \"lblTitle\" Text: \"Welcome\" X: 24 Y: 24 - Type: \"Label\" Name: \"lblGoal\" Text: \"Create a simple home screen with a welcome message and one action button.\" X: 24 Y: 64"
+      - group [ref=e69]:
+        - generic [ref=e70]:
+          - heading "Compatibility Notes" [level=2] [ref=e72]
+          - generic [ref=e74]: Version-aware checks appear here.
+        - generic [ref=e75]:
+          - generic [ref=e76]: Current status
+          - list [ref=e78]:
+            - listitem [ref=e79]: Using latest version
+            - listitem [ref=e80]: Newest screen and style properties are assumed to be available

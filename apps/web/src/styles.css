@@ -92,6 +92,23 @@ body {
   gap: 0.45rem;
 }
 
+.message-panel {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+}
+
+.warning-panel {
+  border: 1px solid #f4c96b;
+  background: #fff9eb;
+}
+
+.error-panel {
+  border: 1px solid #d13438;
+  background: #fff1f0;
+}
+
 @media (min-width: 700px) {
   .studio-shell {
     padding: 2rem;
