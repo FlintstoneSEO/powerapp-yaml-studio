@@ -20,6 +20,11 @@ import type {
   GenerateYamlResponse,
   ValidationWarning,
 } from "@powerapp-yaml-studio/shared";
+import {
+  generateYaml,
+  type GenerateYamlResponse,
+  type ThemeProfile,
+} from "../../../packages/shared/src";
 
 const versionOptions = [
   { value: "latest", label: "Latest" },
@@ -54,6 +59,18 @@ async function requestGeneratedYaml(payload: GenerateYamlRequest) {
 
   return (await response.json()) as GenerateYamlResponse;
 }
+const defaultTheme: ThemeProfile = {
+  themeName: "ContosoBlue",
+  primaryColor: "#115EA3",
+  fontFamily: "Segoe UI",
+  cornerStyle: "rounded",
+};
+
+const initialGeneration = generateYaml({
+  screenGoal: defaultScreenGoal,
+  version: "latest",
+  theme: defaultTheme,
+});
 
 function App() {
   const [screenGoal, setScreenGoal] = useState(defaultScreenGoal);
@@ -67,7 +84,15 @@ function App() {
   const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>(emptyWarnings);
   const [generationError, setGenerationError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [themeName, setThemeName] = useState(defaultTheme.themeName);
+  const [primaryColor, setPrimaryColor] = useState(defaultTheme.primaryColor);
+  const [fontFamily, setFontFamily] = useState(defaultTheme.fontFamily);
+  const [cornerStyle, setCornerStyle] = useState(defaultTheme.cornerStyle);
+  const [yamlOutput, setYamlOutput] = useState(initialGeneration.yaml);
+  const [compatibilityNotes, setCompatibilityNotes] = useState(initialGeneration.compatibilityNotes);
   const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const selectedVersionLabel =
     versionOptions.find((option) => option.value === version)?.label ?? "Latest";
@@ -127,6 +152,38 @@ function App() {
       );
     } finally {
       setIsGenerating(false);
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          screenGoal,
+          version,
+          theme: {
+            themeName,
+            primaryColor,
+            fontFamily,
+            cornerStyle,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to generate YAML right now. Please try again.");
+      }
+
+      const payload = (await response.json()) as GenerateYamlResponse;
+      setYamlOutput(payload.yaml);
+      setCompatibilityNotes(payload.compatibilityNotes);
+    } catch {
+      setErrorMessage("Unable to generate YAML right now. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -152,6 +209,10 @@ function App() {
           disabled={isGenerateDisabled || isGenerating}
         >
           {isGenerating ? "Generating..." : "Generate YAML"}
+          onClick={handleGenerateClick}
+          disabled={isGenerateDisabled || isLoading}
+        >
+          {isLoading ? "Generating YAML..." : "Generate YAML"}
         </Button>
       </header>
 
@@ -269,6 +330,7 @@ function App() {
                   </ul>
                 </div>
               ) : null}
+              {errorMessage ? <Body1 role="alert">{errorMessage}</Body1> : null}
             </div>
           </Card>
 
