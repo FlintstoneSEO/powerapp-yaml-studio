@@ -13,7 +13,7 @@ import {
   Textarea,
   Title2,
 } from "@fluentui/react-components";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const versionOptions = [
   { value: "latest", label: "Latest" },
@@ -29,13 +29,6 @@ const cornerOptions = [
 
 const defaultScreenGoal =
   "Create a simple home screen with a welcome message and one action button.";
-
-type YamlScalar = string | number | boolean | null;
-type YamlValue = YamlScalar | YamlObject | YamlValue[];
-
-type YamlObject = {
-  [key: string]: YamlValue;
-};
 
 function toPascalCase(value: string) {
   const words = value
@@ -61,59 +54,6 @@ function getScreenName(screenGoal: string) {
   return `${toPascalCase(screenGoal)}Screen`;
 }
 
-function formatYamlScalar(value: YamlScalar) {
-  if (typeof value === "string") {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
-
-  if (value === null) {
-    return "null";
-  }
-
-  return String(value);
-}
-
-function isYamlObject(value: YamlValue): value is YamlObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function renderYaml(value: YamlValue, indent = 0): string {
-  const padding = " ".repeat(indent);
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (Array.isArray(item)) {
-          return `${padding}-\n${renderYaml(item, indent + 2)}`;
-        }
-
-        if (isYamlObject(item)) {
-          const renderedObject = renderYaml(item, indent + 2).split("\n");
-          const [firstLine = "", ...restLines] = renderedObject;
-
-          return [`${padding}- ${firstLine.trimStart()}`, ...restLines].join("\n");
-        }
-
-        return `${padding}- ${formatYamlScalar(item)}`;
-      })
-      .join("\n");
-  }
-
-  if (isYamlObject(value)) {
-    return Object.entries(value)
-      .map(([key, nestedValue]) => {
-        if (Array.isArray(nestedValue) || isYamlObject(nestedValue)) {
-          return `${padding}${key}:\n${renderYaml(nestedValue, indent + 2)}`;
-        }
-
-        return `${padding}${key}: ${formatYamlScalar(nestedValue)}`;
-      })
-      .join("\n");
-  }
-
-  return `${padding}${formatYamlScalar(value)}`;
-}
-
 function generateYaml({
   screenGoal,
   version,
@@ -132,35 +72,26 @@ function generateYaml({
   const screenName = getScreenName(screenGoal);
   const goalText = screenGoal.trim() || "Describe the screen goal here.";
 
-  return renderYaml({
-    Screen: {
-      Name: screenName,
-      Theme: themeName,
-      Version: version,
-      Goal: goalText,
-      Style: {
-        PrimaryColor: primaryColor,
-        FontFamily: fontFamily,
-        CornerStyle: cornerStyle,
-      },
-      Controls: [
-        {
-          Type: "Label",
-          Name: "lblTitle",
-          Text: screenName,
-          X: 24,
-          Y: 24,
-        },
-        {
-          Type: "Label",
-          Name: "lblGoal",
-          Text: goalText,
-          X: 24,
-          Y: 64,
-        },
-      ],
-    },
-  });
+  return `Screen:
+  Name: ${screenName}
+  Theme: ${themeName}
+  Version: ${version}
+  Goal: "${goalText}"
+  Style:
+    PrimaryColor: "${primaryColor}"
+    FontFamily: "${fontFamily}"
+    CornerStyle: "${cornerStyle}"
+  Controls:
+    - Type: Label
+      Name: lblTitle
+      Text: "${screenName}"
+      X: 24
+      Y: 24
+    - Type: Label
+      Name: lblGoal
+      Text: "${goalText}"
+      X: 24
+      Y: 64`;
 }
 
 function getCompatibilityNotes(version: string) {
@@ -194,36 +125,14 @@ function App() {
       cornerStyle: "rounded",
     }),
   );
-  const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
   const compatibilityNotes = getCompatibilityNotes(version);
   const selectedVersionLabel =
     versionOptions.find((option) => option.value === version)?.label ?? "Latest";
   const selectedCornerLabel =
     cornerOptions.find((option) => option.value === cornerStyle)?.label ?? "Rounded";
-  const trimmedScreenGoal = screenGoal.trim();
-  const isGenerateDisabled = trimmedScreenGoal.length === 0;
-  const screenGoalValidationMessage = isGenerateDisabled
-    ? "Enter a screen goal to generate YAML."
-    : undefined;
-
-  useEffect(() => {
-    if (copyStatus === "idle") {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setCopyStatus("idle");
-    }, 1800);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [copyStatus]);
 
   function handleGenerateClick() {
-    if (isGenerateDisabled) {
-      return;
-    }
-
     setYamlOutput(
       generateYaml({
         screenGoal,
@@ -236,15 +145,6 @@ function App() {
     );
   }
 
-  async function handleCopyYaml() {
-    try {
-      await navigator.clipboard.writeText(yamlOutput);
-      setCopyStatus("success");
-    } catch {
-      setCopyStatus("error");
-    }
-  }
-
   return (
     <div className="studio-shell">
       <header className="top-header">
@@ -252,7 +152,7 @@ function App() {
           <Text className="product-eyebrow">PowerApp tooling</Text>
           <Title2 as="h1">PowerApp YAML Studio</Title2>
         </div>
-        <Button appearance="primary" onClick={handleGenerateClick} disabled={isGenerateDisabled}>
+        <Button appearance="primary" onClick={handleGenerateClick}>
           Generate YAML
         </Button>
       </header>
@@ -265,11 +165,7 @@ function App() {
               description={<Body1>Describe the app screen you want to generate.</Body1>}
             />
             <div className="card-content">
-              <Field
-                label="Screen goal"
-                validationMessage={screenGoalValidationMessage}
-                validationState={isGenerateDisabled ? "error" : "none"}
-              >
+              <Field label="Screen goal">
                 <Textarea
                   value={screenGoal}
                   onChange={(_, data) => setScreenGoal(data.value)}
@@ -336,17 +232,6 @@ function App() {
               description={<Body1>Ready to copy into Power Apps Studio.</Body1>}
             />
             <div className="card-content">
-              <div className="yaml-toolbar">
-                <Button appearance="secondary" onClick={handleCopyYaml} disabled={!yamlOutput}>
-                  Copy YAML
-                </Button>
-                {copyStatus === "success" ? (
-                  <Text className="copy-feedback success">Copied!</Text>
-                ) : null}
-                {copyStatus === "error" ? (
-                  <Text className="copy-feedback error">Copy failed</Text>
-                ) : null}
-              </div>
               <Field label="YAML output">
                 <Textarea readOnly resize="vertical" value={yamlOutput} rows={12} />
               </Field>

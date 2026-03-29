@@ -63,24 +63,6 @@ body {
   gap: 0.9rem;
 }
 
-.yaml-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.copy-feedback {
-  font-size: 0.875rem;
-}
-
-.copy-feedback.success {
-  color: #0f6cbd;
-}
-
-.copy-feedback.error {
-  color: #b10e1e;
-}
-
 .two-up {
   grid-template-columns: minmax(0, 1fr);
 }
