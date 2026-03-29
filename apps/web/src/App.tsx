@@ -14,6 +14,11 @@ import {
   Title2,
 } from "@fluentui/react-components";
 import { useEffect, useState } from "react";
+import {
+  generateYaml,
+  type GenerateYamlResponse,
+  type ThemeProfile,
+} from "../../../packages/shared/src";
 
 const versionOptions = [
   { value: "latest", label: "Latest" },
@@ -30,173 +35,32 @@ const cornerOptions = [
 const defaultScreenGoal =
   "Create a simple home screen with a welcome message and one action button.";
 
-type YamlScalar = string | number | boolean | null;
-type YamlValue = YamlScalar | YamlObject | YamlValue[];
-
-type YamlObject = {
-  [key: string]: YamlValue;
+const defaultTheme: ThemeProfile = {
+  themeName: "ContosoBlue",
+  primaryColor: "#115EA3",
+  fontFamily: "Segoe UI",
+  cornerStyle: "rounded",
 };
 
-function toPascalCase(value: string) {
-  const words = value
-    .replace(/[^a-zA-Z0-9\s]/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (words.length === 0) {
-    return "GeneratedScreen";
-  }
-
-  return words.map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase()).join("");
-}
-
-function getScreenName(screenGoal: string) {
-  const normalizedGoal = screenGoal.trim().toLowerCase();
-
-  if (normalizedGoal.includes("home screen")) {
-    return "HomeScreen";
-  }
-
-  return `${toPascalCase(screenGoal)}Screen`;
-}
-
-function formatYamlScalar(value: YamlScalar) {
-  if (typeof value === "string") {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
-
-  if (value === null) {
-    return "null";
-  }
-
-  return String(value);
-}
-
-function isYamlObject(value: YamlValue): value is YamlObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function renderYaml(value: YamlValue, indent = 0): string {
-  const padding = " ".repeat(indent);
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (Array.isArray(item)) {
-          return `${padding}-\n${renderYaml(item, indent + 2)}`;
-        }
-
-        if (isYamlObject(item)) {
-          const renderedObject = renderYaml(item, indent + 2).split("\n");
-          const [firstLine = "", ...restLines] = renderedObject;
-
-          return [`${padding}- ${firstLine.trimStart()}`, ...restLines].join("\n");
-        }
-
-        return `${padding}- ${formatYamlScalar(item)}`;
-      })
-      .join("\n");
-  }
-
-  if (isYamlObject(value)) {
-    return Object.entries(value)
-      .map(([key, nestedValue]) => {
-        if (Array.isArray(nestedValue) || isYamlObject(nestedValue)) {
-          return `${padding}${key}:\n${renderYaml(nestedValue, indent + 2)}`;
-        }
-
-        return `${padding}${key}: ${formatYamlScalar(nestedValue)}`;
-      })
-      .join("\n");
-  }
-
-  return `${padding}${formatYamlScalar(value)}`;
-}
-
-function generateYaml({
-  screenGoal,
-  version,
-  themeName,
-  primaryColor,
-  fontFamily,
-  cornerStyle,
-}: {
-  screenGoal: string;
-  version: string;
-  themeName: string;
-  primaryColor: string;
-  fontFamily: string;
-  cornerStyle: string;
-}) {
-  const screenName = getScreenName(screenGoal);
-  const goalText = screenGoal.trim() || "Describe the screen goal here.";
-
-  return renderYaml({
-    Screen: {
-      Name: screenName,
-      Theme: themeName,
-      Version: version,
-      Goal: goalText,
-      Style: {
-        PrimaryColor: primaryColor,
-        FontFamily: fontFamily,
-        CornerStyle: cornerStyle,
-      },
-      Controls: [
-        {
-          Type: "Label",
-          Name: "lblTitle",
-          Text: screenName,
-          X: 24,
-          Y: 24,
-        },
-        {
-          Type: "Label",
-          Name: "lblGoal",
-          Text: goalText,
-          X: 24,
-          Y: 64,
-        },
-      ],
-    },
-  });
-}
-
-function getCompatibilityNotes(version: string) {
-  if (version === "latest") {
-    return [
-      "Using latest version",
-      "Newest screen and style properties are assumed to be available",
-    ];
-  }
-
-  return [
-    `Targeting Power Apps version ${version}`,
-    "Some properties may differ in older versions",
-  ];
-}
+const initialGeneration = generateYaml({
+  screenGoal: defaultScreenGoal,
+  version: "latest",
+  theme: defaultTheme,
+});
 
 function App() {
   const [screenGoal, setScreenGoal] = useState(defaultScreenGoal);
   const [version, setVersion] = useState("latest");
-  const [themeName, setThemeName] = useState("ContosoBlue");
-  const [primaryColor, setPrimaryColor] = useState("#115EA3");
-  const [fontFamily, setFontFamily] = useState("Segoe UI");
-  const [cornerStyle, setCornerStyle] = useState("rounded");
-  const [yamlOutput, setYamlOutput] = useState(
-    generateYaml({
-      screenGoal: defaultScreenGoal,
-      version: "latest",
-      themeName: "ContosoBlue",
-      primaryColor: "#115EA3",
-      fontFamily: "Segoe UI",
-      cornerStyle: "rounded",
-    }),
-  );
+  const [themeName, setThemeName] = useState(defaultTheme.themeName);
+  const [primaryColor, setPrimaryColor] = useState(defaultTheme.primaryColor);
+  const [fontFamily, setFontFamily] = useState(defaultTheme.fontFamily);
+  const [cornerStyle, setCornerStyle] = useState(defaultTheme.cornerStyle);
+  const [yamlOutput, setYamlOutput] = useState(initialGeneration.yaml);
+  const [compatibilityNotes, setCompatibilityNotes] = useState(initialGeneration.compatibilityNotes);
   const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const compatibilityNotes = getCompatibilityNotes(version);
   const selectedVersionLabel =
     versionOptions.find((option) => option.value === version)?.label ?? "Latest";
   const selectedCornerLabel =
@@ -219,21 +83,44 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [copyStatus]);
 
-  function handleGenerateClick() {
+  async function handleGenerateClick() {
     if (isGenerateDisabled) {
       return;
     }
 
-    setYamlOutput(
-      generateYaml({
-        screenGoal,
-        version,
-        themeName,
-        primaryColor,
-        fontFamily,
-        cornerStyle,
-      }),
-    );
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          screenGoal,
+          version,
+          theme: {
+            themeName,
+            primaryColor,
+            fontFamily,
+            cornerStyle,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to generate YAML right now. Please try again.");
+      }
+
+      const payload = (await response.json()) as GenerateYamlResponse;
+      setYamlOutput(payload.yaml);
+      setCompatibilityNotes(payload.compatibilityNotes);
+    } catch {
+      setErrorMessage("Unable to generate YAML right now. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function handleCopyYaml() {
@@ -252,8 +139,12 @@ function App() {
           <Text className="product-eyebrow">PowerApp tooling</Text>
           <Title2 as="h1">PowerApp YAML Studio</Title2>
         </div>
-        <Button appearance="primary" onClick={handleGenerateClick} disabled={isGenerateDisabled}>
-          Generate YAML
+        <Button
+          appearance="primary"
+          onClick={handleGenerateClick}
+          disabled={isGenerateDisabled || isLoading}
+        >
+          {isLoading ? "Generating YAML..." : "Generate YAML"}
         </Button>
       </header>
 
@@ -350,6 +241,7 @@ function App() {
               <Field label="YAML output">
                 <Textarea readOnly resize="vertical" value={yamlOutput} rows={12} />
               </Field>
+              {errorMessage ? <Body1 role="alert">{errorMessage}</Body1> : null}
             </div>
           </Card>
 
