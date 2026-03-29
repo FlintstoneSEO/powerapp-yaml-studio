@@ -28,16 +28,23 @@ function App() {
   return (
     <div className="studio-shell">
       <header className="top-header">
-        <div>
+        <div className="header-copy">
           <Text className="product-eyebrow">PowerApp tooling</Text>
-          <Title2 as="h1">PowerApp YAML Studio</Title2>
+          <Title2 as="h1" className="product-title">
+            PowerApp YAML Studio
+          </Title2>
+          <Body1 className="product-subtitle">
+            Guided YAML generation for polished Power Apps screens.
+          </Body1>
         </div>
-        <Button appearance="primary">Generate YAML</Button>
+        <Button appearance="primary" className="header-action">
+          Generate YAML
+        </Button>
       </header>
 
       <main className="content-grid">
         <section className="left-column" aria-label="Prompt builder and theme profile">
-          <Card>
+          <Card className="panel-card">
             <CardHeader
               header={<Subtitle2 as="h2">Prompt Builder</Subtitle2>}
               description={<Body1>Describe the app screen you want to generate.</Body1>}
@@ -60,7 +67,7 @@ function App() {
             </div>
           </Card>
 
-          <Card>
+          <Card className="panel-card">
             <CardHeader
               header={<Subtitle2 as="h2">Theme Profile</Subtitle2>}
               description={<Body1>Set visual defaults applied to generated YAML.</Body1>}
@@ -87,19 +94,25 @@ function App() {
         </section>
 
         <section className="right-column" aria-label="Generated YAML and compatibility notes">
-          <Card>
+          <Card className="panel-card yaml-panel">
             <CardHeader
               header={<Subtitle2 as="h2">Generated YAML</Subtitle2>}
               description={<Body1>Ready to copy into Power Apps Studio.</Body1>}
             />
             <div className="card-content">
               <Field label="YAML output">
-                <Textarea readOnly resize="vertical" value={sampleYaml} rows={12} />
+                <Textarea
+                  className="yaml-output"
+                  readOnly
+                  resize="vertical"
+                  value={sampleYaml}
+                  rows={12}
+                />
               </Field>
             </div>
           </Card>
 
-          <Card>
+          <Card className="panel-card">
             <CardHeader
               header={<Subtitle2 as="h2">Compatibility Notes</Subtitle2>}
               description={<Body1>Version-aware checks appear here.</Body1>}
