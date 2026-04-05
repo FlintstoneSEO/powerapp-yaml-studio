@@ -20,20 +20,24 @@ export type ValidationWarning = {
   message: string;
 };
 
+export type DocumentationReference = {
+  title: string;
+  source: string;
+  summary: string;
+};
+
 export type GenerateYamlResponse = {
   yaml: string;
   compatibilityNotes: string[];
   validationWarnings: ValidationWarning[];
+  documentationReferences: DocumentationReference[];
+  groundingNote?: string;
 };
 
 export type ApiErrorResponse = {
   error: {
     message: string;
   };
-};
-export type GenerateYamlResponse = {
-  yaml: string;
-  compatibilityNotes: string[];
 };
 
 type YamlScalar = string | number | boolean | null;
@@ -138,12 +142,12 @@ export function generateYaml({
   screenGoal,
   version,
   theme,
-}: GenerateYamlRequest): GenerateYamlResponse {
+}: GenerateYamlRequest): Pick<GenerateYamlResponse, "yaml" | "compatibilityNotes"> {
   const screenName = getScreenName(screenGoal);
   const goalText = screenGoal.trim() || "Describe the screen goal here.";
 
   return {
-    yaml: renderYaml({
+    yaml: `${renderYaml({
       Screen: {
         Name: screenName,
         Theme: theme.themeName,
@@ -171,7 +175,7 @@ export function generateYaml({
           },
         ],
       },
-    }),
+    }).trim()}\n`,
     compatibilityNotes: getCompatibilityNotes(version),
   };
 }

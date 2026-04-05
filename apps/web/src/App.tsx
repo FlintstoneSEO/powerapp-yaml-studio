@@ -16,15 +16,11 @@ import {
 import { useEffect, useState } from "react";
 import type {
   ApiErrorResponse,
+  DocumentationReference,
   GenerateYamlRequest,
-  GenerateYamlResponse,
   ValidationWarning,
 } from "@powerapp-yaml-studio/shared";
-import {
-  generateYaml,
-  type GenerateYamlResponse,
-  type ThemeProfile,
-} from "../../../packages/shared/src";
+import { generateYaml, type ThemeProfile, type GenerateYamlResponse } from "@powerapp-yaml-studio/shared";
 
 const versionOptions = [
   { value: "latest", label: "Latest" },
@@ -41,7 +37,21 @@ const cornerOptions = [
 const defaultScreenGoal =
   "Create a simple home screen with a welcome message and one action button.";
 
+const defaultTheme: ThemeProfile = {
+  themeName: "ContosoBlue",
+  primaryColor: "#115EA3",
+  fontFamily: "Segoe UI",
+  cornerStyle: "rounded",
+};
+
+const initialGeneration = generateYaml({
+  screenGoal: defaultScreenGoal,
+  version: "latest",
+  theme: defaultTheme,
+});
+
 const emptyWarnings: ValidationWarning[] = [];
+const emptyReferences: DocumentationReference[] = [];
 
 async function requestGeneratedYaml(payload: GenerateYamlRequest) {
   const response = await fetch("/api/generate", {
@@ -59,45 +69,29 @@ async function requestGeneratedYaml(payload: GenerateYamlRequest) {
 
   return (await response.json()) as GenerateYamlResponse;
 }
-const defaultTheme: ThemeProfile = {
-  themeName: "ContosoBlue",
-  primaryColor: "#115EA3",
-  fontFamily: "Segoe UI",
-  cornerStyle: "rounded",
-};
-
-const initialGeneration = generateYaml({
-  screenGoal: defaultScreenGoal,
-  version: "latest",
-  theme: defaultTheme,
-});
 
 function App() {
   const [screenGoal, setScreenGoal] = useState(defaultScreenGoal);
   const [version, setVersion] = useState("latest");
-  const [themeName, setThemeName] = useState("ContosoBlue");
-  const [primaryColor, setPrimaryColor] = useState("#115EA3");
-  const [fontFamily, setFontFamily] = useState("Segoe UI");
-  const [cornerStyle, setCornerStyle] = useState("rounded");
-  const [yamlOutput, setYamlOutput] = useState("");
-  const [compatibilityNotes, setCompatibilityNotes] = useState<string[]>([]);
-  const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>(emptyWarnings);
-  const [generationError, setGenerationError] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [themeName, setThemeName] = useState(defaultTheme.themeName);
   const [primaryColor, setPrimaryColor] = useState(defaultTheme.primaryColor);
   const [fontFamily, setFontFamily] = useState(defaultTheme.fontFamily);
   const [cornerStyle, setCornerStyle] = useState(defaultTheme.cornerStyle);
   const [yamlOutput, setYamlOutput] = useState(initialGeneration.yaml);
   const [compatibilityNotes, setCompatibilityNotes] = useState(initialGeneration.compatibilityNotes);
+  const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>(emptyWarnings);
+  const [documentationReferences, setDocumentationReferences] =
+    useState<DocumentationReference[]>(emptyReferences);
+  const [groundingNote, setGroundingNote] = useState("");
+  const [generationError, setGenerationError] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
   const selectedVersionLabel =
     versionOptions.find((option) => option.value === version)?.label ?? "Latest";
   const selectedCornerLabel =
     cornerOptions.find((option) => option.value === cornerStyle)?.label ?? "Rounded";
+
   const trimmedScreenGoal = screenGoal.trim();
   const isGenerateDisabled = trimmedScreenGoal.length === 0;
   const screenGoalValidationMessage = isGenerateDisabled
@@ -143,47 +137,19 @@ function App() {
       setYamlOutput(response.yaml);
       setCompatibilityNotes(response.compatibilityNotes);
       setValidationWarnings(response.validationWarnings);
+      setDocumentationReferences(response.documentationReferences);
+      setGroundingNote(response.groundingNote ?? "");
     } catch (error) {
       setYamlOutput("");
       setCompatibilityNotes([]);
       setValidationWarnings(emptyWarnings);
+      setDocumentationReferences(emptyReferences);
+      setGroundingNote("");
       setGenerationError(
         error instanceof Error ? error.message : "Unable to generate YAML right now.",
       );
     } finally {
       setIsGenerating(false);
-    setIsLoading(true);
-    setErrorMessage("");
-
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          screenGoal,
-          version,
-          theme: {
-            themeName,
-            primaryColor,
-            fontFamily,
-            cornerStyle,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Unable to generate YAML right now. Please try again.");
-      }
-
-      const payload = (await response.json()) as GenerateYamlResponse;
-      setYamlOutput(payload.yaml);
-      setCompatibilityNotes(payload.compatibilityNotes);
-    } catch {
-      setErrorMessage("Unable to generate YAML right now. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -209,10 +175,6 @@ function App() {
           disabled={isGenerateDisabled || isGenerating}
         >
           {isGenerating ? "Generating..." : "Generate YAML"}
-          onClick={handleGenerateClick}
-          disabled={isGenerateDisabled || isLoading}
-        >
-          {isLoading ? "Generating YAML..." : "Generate YAML"}
         </Button>
       </header>
 
@@ -330,7 +292,6 @@ function App() {
                   </ul>
                 </div>
               ) : null}
-              {errorMessage ? <Body1 role="alert">{errorMessage}</Body1> : null}
             </div>
           </Card>
 
@@ -348,6 +309,29 @@ function App() {
                   </li>
                 ))}
               </ul>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader
+              header={<Subtitle2 as="h2">Documentation References</Subtitle2>}
+              description={<Body1>Grounding context from Microsoft Learn MCP.</Body1>}
+            />
+            <div className="card-content">
+              {groundingNote ? <Body1>{groundingNote}</Body1> : null}
+              {documentationReferences.length === 0 ? (
+                <Body1>No documentation references were returned for this request.</Body1>
+              ) : (
+                <ul className="notes-list">
+                  {documentationReferences.map((reference, index) => (
+                    <li key={`${reference.source}-${index}`}>
+                      <Body1Strong>{reference.title}</Body1Strong>
+                      <Body1>{reference.summary}</Body1>
+                      <Text>{reference.source}</Text>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </Card>
         </section>
